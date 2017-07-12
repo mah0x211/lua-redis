@@ -78,14 +78,14 @@ local function flatten( tbl )
 end
 
 
---- query
+--- pushq
 -- @param c
 -- @param key
 -- @param ...
 -- @return ok
 -- @return err
 -- @return again
-local function query( c, ... )
+local function pushq( c, ... )
     -- enqueue
     if c.cmd == 'HMSET' then
         c.sndq:push({
@@ -113,7 +113,8 @@ local function command( c, cmd )
     end
 
     c.cmd = cmd:upper();
-    return query;
+
+    return pushq;
 end
 
 
