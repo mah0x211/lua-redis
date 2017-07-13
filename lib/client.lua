@@ -27,9 +27,11 @@
 --]]
 
 --- assign to local
+local InetClient = require('net.stream.inet').client;
 local Deque = require('deque');
 local RESP = require('resp');
-local InetClient = require('net.stream.inet').client;
+local encode = RESP.encode;
+local concat = table.concat;
 local _tostring = tostring;
 --- constants
 local OK = RESP.OK;
@@ -78,25 +80,38 @@ local function flatten( tbl )
 end
 
 
+--- query
+-- @param cmd
+-- @param key
+-- @param ...
+-- @return qry
+local function query( cmd, key, ... )
+    if key then
+        if cmd == 'HMSET' then
+            return encode( cmd, key, flatten( ... ) );
+        end
+
+        return encode( cmd, key, ... );
+    end
+
+    return encode( cmd );
+end
+
+
 --- pushq
 -- @param c
--- @param key
 -- @param ...
 -- @return ok
 -- @return err
 -- @return again
 local function pushq( c, ... )
     -- enqueue
-    if c.cmd == 'HMSET' then
-        c.sndq:push({
-            cmd = c.cmd,
-            qry = c.resp:encode( c.cmd, ({...})[1], flatten( select( 2, ... ) ) )
-        });
+    c.rcvq:push( c.cmd );
+    if c.sink == false then
+        c.sndq:push({ query( c.cmd, ... ) });
     else
-        c.sndq:push({
-            cmd = c.cmd,
-            qry = c.resp:encode( c.cmd, ... )
-        });
+        c.nqry = c.nqry + 1;
+        c.sink[c.nqry] = query( c.cmd, ... );
     end
 
     return c:drain();
@@ -120,6 +135,35 @@ end
 
 --- class Client
 local Client = {};
+
+
+--- pipeline
+-- @return self
+function Client:pipeline()
+    for _ = 1, self.nqry do
+        self.rcvq:pop();
+    end
+    self.sink = {};
+    self.nqry = 0;
+
+    return self;
+end
+
+
+--- emit
+-- @return ok
+-- @return err
+-- @return again
+function Client:emit()
+    -- enqueue
+    if self.sink ~= false then
+        self.sndq:push({ concat( self.sink ) });
+        self.sink = false;
+        self.nqry = 0;
+    end
+
+    return self:drain();
+end
 
 
 --- recv
@@ -169,16 +213,15 @@ function Client:drain()
     -- send queued queries
     if #sndq > 0 then
         local sock = self.sock;
-        local rcvq = self.rcvq;
         local head = sndq:head();
 
         repeat
             local data = head:data();
-            local len, err, again = sock:send( data.qry );
+            local len, err, again = sock:send( data[1] );
 
             -- send buffer is full
             if again then
-                data.qry = data.qry:sub( len + 1 );
+                data[1] = data[1]:sub( len + 1 );
                 return true, nil, true;
             -- got error
             elseif err then
@@ -188,8 +231,6 @@ function Client:drain()
                 return false;
             end
 
-            -- add recv queue
-            rcvq:push( data.cmd );
             -- remove sent data
             sndq:shift();
             head = sndq:head();
@@ -244,6 +285,8 @@ local function new( cfg )
 
     return setmetatable({
         sock = sock,
+        sink = false,
+        nqry = 0,
         resp = RESP.new(),
         rcvq = Deque.new(),
         sndq = Deque.new()
