@@ -28,7 +28,6 @@
 
 --- assign to local
 local InetClient = require('net.stream.inet').client;
-local Deque = require('deque');
 local RESP = require('resp');
 local encode = RESP.encode;
 local concat = table.concat;
@@ -106,13 +105,14 @@ end
 -- @return again
 local function pushq( c, ... )
     -- enqueue
-    c.rcvq:push( c.cmd );
-    if c.sink == false then
-        c.sndq:push({ query( c.cmd, ... ) });
-    else
-        c.nqry = c.nqry + 1;
-        c.sink[c.nqry] = query( c.cmd, ... );
+    c.tail = c.tail + 1;
+    c.rcvq[c.tail] = c.cmd;
+    if c.sink ~= false then
+        c.sink[#c.sink + 1] = query( c.cmd, ... );
+        return true;
     end
+
+    c.sock:sendq( query( c.cmd, ... ) );
 
     return c:drain();
 end
@@ -140,12 +140,7 @@ local Client = {};
 --- pipeline
 -- @return self
 function Client:pipeline()
-    for _ = 1, self.nqry do
-        self.rcvq:pop();
-    end
     self.sink = {};
-    self.nqry = 0;
-
     return self;
 end
 
@@ -157,9 +152,8 @@ end
 function Client:emit()
     -- enqueue
     if self.sink ~= false then
-        self.sndq:push({ concat( self.sink ) });
+        self.sock:sendq( concat( self.sink ) );
         self.sink = false;
-        self.nqry = 0;
     end
 
     return self:drain();
@@ -173,7 +167,7 @@ end
 -- @return again
 function Client:recv()
     -- recv response
-    if #self.rcvq > 0 then
+    if self.tail > 0 then
         local sock = self.sock;
         local resp = self.resp;
         local data;
@@ -183,7 +177,15 @@ function Client:recv()
 
             -- decoded
             if rc == OK then
-                self.rcvq:shift();
+                self.rcvq[self.head] = nil;
+                -- update head
+                if self.head ~= self.tail then
+                    self.head = self.head + 1;
+                -- reset head and tail
+                else
+                    self.head, self.tail = 1, 0;
+                end
+
                 return true, msg, extra;
             elseif rc == EILSEQ then
                 self.rcvq:shift();
@@ -208,33 +210,18 @@ end
 -- @return err
 -- @return again
 function Client:drain()
-    local sndq = self.sndq;
-
     -- send queued queries
-    if #sndq > 0 then
-        local sock = self.sock;
-        local head = sndq:head();
+    local len, err, again = self.sock:flushq();
 
-        repeat
-            local data = head:data();
-            local len, err, again = sock:send( data[1] );
-
-            -- send buffer is full
-            if again then
-                data[1] = data[1]:sub( len + 1 );
-                return true, nil, true;
-            -- got error
-            elseif err then
-                return false, err;
-            -- closed by peer
-            elseif not len then
-                return false;
-            end
-
-            -- remove sent data
-            sndq:shift();
-            head = sndq:head();
-        until head == nil;
+    -- send buffer is full
+    if again then
+        return true, nil, true;
+    -- got error
+    elseif err then
+        return false, err;
+    -- closed by peer
+    elseif not len then
+        return false;
     end
 
     return true;
@@ -285,11 +272,11 @@ local function new( cfg )
 
     return setmetatable({
         sock = sock,
-        sink = false,
-        nqry = 0,
         resp = RESP.new(),
-        rcvq = Deque.new(),
-        sndq = Deque.new()
+        rcvq = {},
+        head = 1,
+        tail = 0,
+        sink = false
     }, {
         __index = Client
     });

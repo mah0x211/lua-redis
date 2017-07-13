@@ -11,7 +11,6 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "deque >= 0.4.0",
     "net >= 0.12.0",
     "resp >= 0.3.3"
 }
