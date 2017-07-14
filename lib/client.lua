@@ -104,17 +104,18 @@ end
 -- @return err
 -- @return again
 local function pushq( c, ... )
-    -- enqueue
+    -- update recvq
     c.tail = c.tail + 1;
     c.rcvq[c.tail] = c.cmd;
-    if c.sink ~= false then
-        c.sink[#c.sink + 1] = query( c.cmd, ... );
-        return true;
+    if c.sink == false then
+        c.sock:sendq( query( c.cmd, ... ) );
+        return c:drain();
     end
 
-    c.sock:sendq( query( c.cmd, ... ) );
+    -- pipeline
+    c.sink[#c.sink + 1] = query( c.cmd, ... );
 
-    return c:drain();
+    return true;
 end
 
 
@@ -155,7 +156,9 @@ end
 function Client:emit()
     -- enqueue
     if self.sink ~= false then
-        self.sock:sendq( concat( self.sink ) );
+        if #self.sink > 0 then
+            self.sock:sendq( concat( self.sink ) );
+        end
         self.sink = false;
     end
 
