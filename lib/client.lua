@@ -140,7 +140,10 @@ local Client = {};
 --- pipeline
 -- @return self
 function Client:pipeline()
-    self.sink = {};
+    if self.sink == false then
+        self.sink = {};
+    end
+
     return self;
 end
 
