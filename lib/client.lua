@@ -66,9 +66,11 @@ local function flatten( tbl )
     local idx = 1;
 
     for k, v in pairs( tbl ) do
-        k = tostring( k );
-        v = k and tostring( v );
-        if v then
+        if type( k ) == 'string' and #k > 0 then
+            if type( v ) ~= 'number' then
+                v = tostring( v );
+            end
+
             arr[idx] = k;
             arr[idx + 1] = v;
             idx = idx + 2;
