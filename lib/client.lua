@@ -120,29 +120,26 @@ local function recv( self, nres )
         local chunk, err, timeout = sock:recv();
 
         if not chunk or err or timeout then
-            print('error', chunk, err, timeout)
             return nil, err, timeout;
-        else
-            data = data .. chunk;
-            while true do
-                local pos, msg = decode( data, cur );
+        end
 
-                print( cur, pos, #data, msg )
-                if pos > 0 then
-                    idx = idx + 1;
-                    res[idx] = msg;
-                    print( idx, nres );
-                    if idx == nres then
-                        return idx == 1 and res[1] or res;
-                    end
-                    -- update cursor
-                    cur = pos;
-                -- decode failure
-                elseif pos == EILSEQ then
-                    return nil, 'illegal byte sequence received';
-                else
-                    break;
+        data = data .. chunk;
+        while true do
+            local pos, msg = decode( data, cur );
+
+            if pos > 0 then
+                idx = idx + 1;
+                res[idx] = msg;
+                if idx == nres then
+                    return idx == 1 and res[1] or res;
                 end
+                -- update cursor
+                cur = pos;
+            -- decode failure
+            elseif pos == EILSEQ then
+                return nil, 'illegal byte sequence received';
+            else
+                break;
             end
         end
     end
