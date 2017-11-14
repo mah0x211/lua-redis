@@ -25,21 +25,23 @@
   Created by Masatoshi Teruya on 17/07/11.
 
 --]]
-
 --- assign to local
 local InetClient = require('net.stream.inet').client;
-local RESP = require('resp');
-local encode = RESP.encode;
+local encode2array = require('resp').encode2array;
+local decode = require('resp').decode;
+local type = type;
+local error = error;
+local assert = assert;
+local setmetatable = setmetatable;
+local strfind = string.find;
+local strformat = string.format;
 local concat = table.concat;
 local _tostring = tostring;
 --- constants
-local OK = RESP.OK;
-local EAGAIN = RESP.EAGAIN;
-local EILSEQ = RESP.EILSEQ;
+local EILSEQ = require('resp').EILSEQ;
 local DEFAULT_OPTS = {
     host = '127.0.0.1',
     port = 6379,
-    nonblock = false
 };
 
 
@@ -89,48 +91,98 @@ end
 local function query( cmd, key, ... )
     if key then
         if cmd == 'HMSET' then
-            return encode( cmd, key, flatten( ... ) );
+            return encode2array( cmd, key, flatten( ... ) );
         end
 
-        return encode( cmd, key, ... );
+        return encode2array( cmd, key, ... );
     end
 
-    return encode( cmd );
+    return encode2array( cmd );
+end
+
+
+--- recv
+-- @param self
+-- @param nres
+-- @return res
+-- @return err
+-- @return timeout
+local function recv( self, nres )
+    local sock = self.sock;
+    local res = {};
+    local data = '';
+    local idx = 0;
+    local cur = 0;
+
+    assert( nres > idx );
+    -- recv N response
+    while true do
+        local chunk, err, timeout = sock:recv();
+
+        if not chunk or err or timeout then
+            print('error', chunk, err, timeout)
+            return nil, err, timeout;
+        else
+            data = data .. chunk;
+            while true do
+                local pos, msg = decode( data, cur );
+
+                print( cur, pos, #data, msg )
+                if pos > 0 then
+                    idx = idx + 1;
+                    res[idx] = msg;
+                    print( idx, nres );
+                    if idx == nres then
+                        return idx == 1 and res[1] or res;
+                    end
+                    -- update cursor
+                    cur = pos;
+                -- decode failure
+                elseif pos == EILSEQ then
+                    return nil, 'illegal byte sequence received';
+                else
+                    break;
+                end
+            end
+        end
+    end
 end
 
 
 --- pushq
--- @param c
+-- @param self
 -- @param ...
--- @return ok
+-- @return res
 -- @return err
--- @return again
-local function pushq( c, ... )
-    -- update recvq
-    c.tail = c.tail + 1;
-    c.rcvq[c.tail] = c.cmd;
-    if c.sink == false then
-        c.sock:sendq( query( c.cmd, ... ) );
-        return c:drain();
+-- @return timeout
+local function pushq( self, ... )
+    if not self.cmdq then
+        local len, err, timeout = self.sock:send( query( self.cmd, ... ) );
+
+        if not len or err or timeout then
+            return nil, err, timeout;
+        end
+
+        return recv( self, 1 );
     end
 
     -- pipeline
-    c.sink[#c.sink + 1] = query( c.cmd, ... );
+    self.cmdq[#self.cmdq + 1] = query( self.cmd, ... );
 
-    return true;
+    return self;
 end
 
 
 --- command
--- @param c
+-- @param self
 -- @param cmd
 -- @return fn
-local function command( c, cmd )
-    if type( cmd ) ~= 'string' or not cmd:find('^%a%w*$') then
-        error( ('invalid command %q'):format( cmd ) );
+local function command( self, cmd )
+    if type( cmd ) ~= 'string' or not strfind( cmd, '^%a%w*$' ) then
+        error( strformat('invalid command %q', cmd ) );
     end
 
-    c.cmd = cmd:upper();
+    self.cmd = cmd:upper();
 
     return pushq;
 end
@@ -143,8 +195,8 @@ local Client = {};
 --- pipeline
 -- @return self
 function Client:pipeline()
-    if self.sink == false then
-        self.sink = {};
+    if not self.cmdq then
+        self.cmdq = {};
     end
 
     return self;
@@ -152,88 +204,30 @@ end
 
 
 --- emit
--- @return ok
+-- @return res
 -- @return err
--- @return again
+-- @return timeout
 function Client:emit()
-    -- enqueue
-    if self.sink ~= false then
-        if #self.sink > 0 then
-            self.sock:sendq( concat( self.sink ) );
-        end
-        self.sink = false;
-    end
+    if self.cmdq then
+        local cmdq = self.cmdq;
+        local ncmd = #cmdq;
 
-    return self:drain();
-end
+        self.cmdq = false;
+        if ncmd > 0 then
+            local qry = concat( cmdq );
+            local len, err, timeout = self.sock:send( qry );
 
-
---- recv
--- @return ok
--- @return msg
--- @return extra
--- @return again
-function Client:recv()
-    -- recv response
-    if self.tail > 0 then
-        local sock = self.sock;
-        local resp = self.resp;
-        local data;
-
-        while true do
-            local rc, msg, extra = resp:decode( data );
-
-            -- decoded
-            if rc == OK then
-                self.rcvq[self.head] = nil;
-                -- update head
-                if self.head ~= self.tail then
-                    self.head = self.head + 1;
-                -- reset head and tail
-                else
-                    self.head, self.tail = 1, 0;
-                end
-
-                return true, msg, extra;
-            elseif rc == EILSEQ then
-                self.rcvq:shift();
-                return false, nil, nil, 'illegal byte sequence';
-            elseif rc == EAGAIN then
-                local err, again;
-
-                data, err, again = sock:recv();
-                if not data then
-                    return false, nil, nil, err, again;
-                end
+            if not len or err or timeout then
+                return nil, err, timeout;
             end
+
+            return recv( self, ncmd );
         end
     end
 
-    return false, nil, nil, true;
+    return nil, 'pipeline request not exists';
 end
 
-
---- drain
--- @return ok
--- @return err
--- @return again
-function Client:drain()
-    -- send queued queries
-    local len, err, again = self.sock:flushq();
-
-    -- send buffer is full
-    if again then
-        return true, nil, true;
-    -- got error
-    elseif err then
-        return false, err;
-    -- closed by peer
-    elseif not len then
-        return false;
-    end
-
-    return true;
-end
 
 
 Client = setmetatable( Client, {
@@ -245,7 +239,6 @@ Client = setmetatable( Client, {
 -- @param cfg
 --  host: string
 --  port: string
---  nonblock: boolean
 -- @return cli
 -- @return err
 local function new( cfg )
@@ -265,7 +258,7 @@ local function new( cfg )
                 local t = type( v );
 
                 if type( cv ) ~= t then
-                    error( ('cfg.%s must be %s'):format( k, t ) );
+                    error( strformat( 'cfg.%s must be %s', k, t ) );
                 end
                 opts[k] = cv;
             end
@@ -280,11 +273,7 @@ local function new( cfg )
 
     return setmetatable({
         sock = sock,
-        resp = RESP.new(),
-        rcvq = {},
-        head = 1,
-        tail = 0,
-        sink = false
+        cmdq = false,
     }, {
         __index = Client
     });
