@@ -33,6 +33,7 @@ local type = type;
 local error = error;
 local assert = assert;
 local setmetatable = setmetatable;
+local strsub = string.sub;
 local strfind = string.find;
 local strformat = string.format;
 local concat = table.concat;
@@ -151,7 +152,11 @@ local function recv( self, nres )
             -- decode failure
             elseif pos == EILSEQ then
                 return nil, 'illegal byte sequence received';
+            -- need more bytes
             else
+                -- remove used data
+                data = strsub( data, cur + 1 );
+                cur = 0;
                 break;
             end
         end
