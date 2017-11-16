@@ -44,6 +44,13 @@ local DEFAULT_OPTS = {
     host = '127.0.0.1',
     port = 6379,
 };
+--- subscriber can send only the following commands;
+local SUBSCRIBE_CMDS = {
+    SUBSCRIBE = true,
+    PSUBSCRIBE = true,
+    UNSUBSCRIBE = true,
+    PUNSUBSCRIBE = true
+};
 
 
 --- tostring
@@ -159,18 +166,29 @@ end
 -- @return err
 -- @return timeout
 local function pushq( self, ... )
+    local nres = self.nres;
+
+    -- count nres
+    if SUBSCRIBE_CMDS[self.cmd] then
+        nres = nres + select( '#', ... );
+    else
+        nres = nres + 1;
+    end
+
     if not self.cmdq then
         local len, err, timeout = self.sock:send( query( self.cmd, ... ) );
 
+        self.nres = 0;
         if not len or err or timeout then
             return nil, err, timeout;
         end
 
-        return recv( self, 1 );
+        return recv( self, nres );
     end
 
     -- pipeline
     self.cmdq[#self.cmdq + 1] = query( self.cmd, ... );
+    self.nres = nres;
 
     return self;
 end
@@ -212,11 +230,12 @@ end
 -- @return timeout
 function Client:emit()
     if self.cmdq then
+        local nres = self.nres;
         local cmdq = self.cmdq;
-        local ncmd = #cmdq;
 
+        self.nres = 0;
         self.cmdq = false;
-        if ncmd > 0 then
+        if nres > 0 then
             local qry = concat( cmdq );
             local len, err, timeout = self.sock:send( qry );
 
@@ -224,7 +243,7 @@ function Client:emit()
                 return nil, err, timeout;
             end
 
-            return recv( self, ncmd );
+            return recv( self, nres );
         end
     end
 
@@ -277,6 +296,7 @@ local function new( cfg )
     return setmetatable({
         sock = sock,
         cmdq = false,
+        nres = 0
     }, {
         __index = Client
     });
