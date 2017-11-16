@@ -39,6 +39,7 @@ local concat = table.concat;
 local _tostring = tostring;
 --- constants
 local EILSEQ = require('resp').EILSEQ;
+local ERR = require('resp').ERR;
 local DEFAULT_OPTS = {
     host = '127.0.0.1',
     port = 6379,
@@ -133,8 +134,10 @@ local function recv( self, nres )
                     typ = typ,
                     msg = msg
                 };
-                if idx == nres then
-                    return idx == 1 and res[1] or res;
+                -- got error or received all responses
+                if typ == ERR or idx == nres then
+                    assert( #data == pos );
+                    return res;
                 end
                 -- update cursor
                 cur = pos;
