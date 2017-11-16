@@ -11,8 +11,8 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "net >= 0.19.0",
-    "resp >= 0.5.2",
+    "net >= 0.19.1",
+    "resp >= 0.5.3",
 }
 build = {
     type = "builtin",
