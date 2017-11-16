@@ -125,11 +125,14 @@ local function recv( self, nres )
 
         data = data .. chunk;
         while true do
-            local pos, msg = decode( data, cur );
+            local pos, msg, typ = decode( data, cur );
 
             if pos > 0 then
                 idx = idx + 1;
-                res[idx] = msg;
+                res[idx] = {
+                    typ = typ,
+                    msg = msg
+                };
                 if idx == nres then
                     return idx == 1 and res[1] or res;
                 end
