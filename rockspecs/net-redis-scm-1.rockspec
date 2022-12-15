@@ -18,6 +18,7 @@ build = {
     type = "builtin",
     modules = {
         ['net.redis.client'] = "lib/client.lua",
-    }
+        ['net.redis.encode'] = "lib/encode.lua",
+    },
 }
 
