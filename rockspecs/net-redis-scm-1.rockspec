@@ -20,6 +20,7 @@ build = {
         ['net.redis.client'] = "lib/client.lua",
         ['net.redis.decode'] = "lib/decode.lua",
         ['net.redis.encode'] = "lib/encode.lua",
+        ['net.redis.subscriber'] = "lib/subscriber.lua",
     },
 }
 
