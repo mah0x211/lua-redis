@@ -50,10 +50,12 @@ local Connection = {}
 --- @param opts? table
 --- @return net.redis.client.Connection? c
 --- @return any err
+--- @return boolean? timeout
 function Connection:init(host, port, opts)
-    local sock, err = new_inet_client(host or '127.0.0.1', port or 6379, opts)
+    local sock, err, timeout = new_inet_client(host or '127.0.0.1',
+                                               port or 6379, opts)
     if err then
-        return nil, err
+        return nil, err, timeout
     end
 
     self.sock = sock
