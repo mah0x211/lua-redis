@@ -199,6 +199,20 @@ function Connection:multi(fn)
     return res, err, timeout
 end
 
+--- close
+---@return boolean ok
+---@return any err
+---@return boolean? timeout
+function Connection:close()
+    local res, err, timeout = self:sendcmd('QUIT')
+    if not res then
+        return false, err, timeout
+    elseif res.error then
+        return false, res.message
+    end
+    return self.sock:close()
+end
+
 --- pushcmd
 --- @param cmd string
 --- @param ... string
@@ -338,6 +352,15 @@ local function multi(self, fn)
     return self.conn:multi(fn)
 end
 
+--- close
+--- @param self net.redis.client
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+local function close(self)
+    return self.conn:close()
+end
+
 --- @class net.redis.client
 --- @field conn net.redis.client.Connection
 --- @field cmd string
@@ -357,6 +380,7 @@ local function new(host, port, opts)
     return setmetatable({
         conn = conn,
         cmd = '',
+        close = close,
         pipeline = pipeline,
         multi = multi,
     }, {
