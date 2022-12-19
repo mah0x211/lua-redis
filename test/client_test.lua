@@ -7,7 +7,7 @@ function testcase.before_each()
     local c = assert(redis.new())
     local res = assert(c:flushall())
     assert.equal(res.message, 'OK')
-    assert(c:close())
+    assert(c:quit())
 end
 
 function testcase.error_message()
