@@ -201,11 +201,11 @@ function Connection:multi(fn)
     return res, err, timeout
 end
 
---- close
+--- quit
 ---@return boolean ok
 ---@return any err
 ---@return boolean? timeout
-function Connection:close()
+function Connection:quit()
     local res, err, timeout = self:sendcmd('QUIT')
     if not res then
         return false, err, timeout
@@ -354,13 +354,13 @@ local function multi(self, fn)
     return self.conn:multi(fn)
 end
 
---- close
+--- quit
 --- @param self net.redis.client
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
-local function close(self)
-    return self.conn:close()
+local function quit(self)
+    return self.conn:quit()
 end
 
 --- @class net.redis.client
@@ -383,7 +383,7 @@ local function new(host, port, opts)
     return setmetatable({
         conn = conn,
         cmd = '',
-        close = close,
+        quit = quit,
         pipeline = pipeline,
         multi = multi,
     }, {
