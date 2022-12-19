@@ -297,7 +297,7 @@ Connection = require('metamodule').new.Connection(Connection)
 --- @return any err
 --- @return boolean? timeout
 local function sendcmd(self, ...)
-    return self.conn:sendcmd(self.cmd, ...)
+    return self._conn:sendcmd(self._cmd, ...)
 end
 
 --- subscmd
@@ -306,7 +306,7 @@ end
 --- @return any err
 --- @return boolean? timeout
 local function subscmd(self, ...)
-    return self.conn:subscmd(self.cmd, ...)
+    return self._conn:subscmd(self._cmd, ...)
 end
 
 --- unsubscmd
@@ -317,7 +317,7 @@ end
 local function unsubscmd(self, ...)
     return nil, format(
                'command %q must be executed by the net.redis.subscriber',
-               self.cmd)
+               self._cmd)
 end
 
 --- command
@@ -328,8 +328,8 @@ local function command(self, cmd)
         error(format('invalid command %q', cmd))
     end
 
-    self.cmd = upper(cmd)
-    local subs = SUBSCRIBE_CMDS[self.cmd]
+    self._cmd = upper(cmd)
+    local subs = SUBSCRIBE_CMDS[self._cmd]
     if not subs then
         return sendcmd
     elseif subs == SUBSCRIBE then
@@ -345,7 +345,7 @@ end
 --- @return any err
 --- @return boolean? timeout
 local function pipeline(self, fn)
-    return self.conn:pipeline(fn)
+    return self._conn:pipeline(fn)
 end
 
 --- multi
@@ -355,7 +355,7 @@ end
 --- @return any err
 --- @return boolean? timeout
 local function multi(self, fn)
-    return self.conn:multi(fn)
+    return self._conn:multi(fn)
 end
 
 --- quit
@@ -364,12 +364,12 @@ end
 --- @return any err
 --- @return boolean? timeout
 local function quit(self)
-    return self.conn:quit()
+    return self._conn:quit()
 end
 
 --- @class net.redis.client
---- @field conn net.redis.client.Connection
---- @field cmd string
+--- @field _conn net.redis.client.Connection
+--- @field _cmd string
 
 --- new
 --- @param host? string
@@ -385,10 +385,10 @@ local function new(host, port, opts)
     end
 
     return setmetatable({
-        conn = conn,
-        cmd = '',
-        quit = quit,
+        _conn = conn,
+        _cmd = '',
         pipeline = pipeline,
+        quit = quit,
         multi = multi,
     }, {
         __index = command,
