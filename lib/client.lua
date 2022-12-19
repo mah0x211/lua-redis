@@ -371,10 +371,11 @@ end
 --- @param opts? table
 --- @return net.redis.client? c
 --- @return any err
+--- @return boolean? timeout
 local function new(host, port, opts)
-    local conn, err = Connection(host, port, opts)
+    local conn, err, timeout = Connection(host, port, opts)
     if err then
-        return nil, err
+        return nil, err, timeout
     end
 
     return setmetatable({
