@@ -1,7 +1,7 @@
 package = "net-redis"
 version = "scm-1"
 source = {
-    url = "git://github.com/mah0x211/lua-net-redis.git"
+    url = "git+https://github.com/mah0x211/lua-net-redis.git",
 }
 description = {
     summary = "redis module for lua",
@@ -11,7 +11,8 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "net >= 0.19.1",
+    "isa >= 0.3",
+    "net >= 0.34",
     "resp >= 0.5.3",
 }
 build = {

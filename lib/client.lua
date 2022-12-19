@@ -20,287 +20,347 @@
 -- THE SOFTWARE.
 --
 --- assign to local
-local InetClient = require('net.stream.inet').client
-local encode2array = require('resp').encode2array
-local decode = require('resp').decode
-local type = type
 local error = error
 local assert = assert
+local select = select
 local setmetatable = setmetatable
-local strsub = string.sub
-local strfind = string.find
-local strformat = string.format
+local sub = string.sub
+local find = string.find
+local format = string.format
+local upper = string.upper
 local concat = table.concat
-local _tostring = tostring
---- constants
-local EILSEQ = require('resp').EILSEQ
-local ERR = require('resp').ERR
-local DEFAULT_OPTS = {
-    host = '127.0.0.1',
-    port = 6379,
-}
---- subscriber can send only the following commands
-local SUBSCRIBE_CMDS = {
-    SUBSCRIBE = true,
-    PSUBSCRIBE = true,
-    UNSUBSCRIBE = true,
-    PUNSUBSCRIBE = true,
-}
+local isa = require('isa')
+local is_callable = isa.callable
+local is_string = isa.string
+local new_inet_client = require('net.stream.inet').client.new
+local new_subscriber = require('net.redis.subscriber')
+local encode = require('net.redis.encode')
+local decode = require('net.redis.decode')
 
---- tostring
--- @param v
--- @return str
-local function tostring(v)
-    if type(v) ~= 'string' then
-        v = _tostring(v)
+--- @class net.redis.client.Connection
+--- @field sock net.Socket
+--- @field pipelined boolean
+--- @field cmds string[]
+--- @field queries string[]
+local Connection = {}
+
+--- new
+--- @param host? string
+--- @param port? integer|string
+--- @param opts? table
+--- @return net.redis.client.Connection? c
+--- @return any err
+function Connection:init(host, port, opts)
+    local sock, err = new_inet_client(host or '127.0.0.1', port or 6379, opts)
+    if err then
+        return nil, err
     end
 
-    if #v > 0 then
-        return v
-    end
-end
-
---- flatten
--- @param tbl
--- @return arr
--- @return err
-local function flatten(tbl)
-    local arr = {}
-    local idx = 1
-
-    for k, v in pairs(tbl) do
-        if type(k) == 'string' and #k > 0 then
-            if type(v) ~= 'number' then
-                v = tostring(v)
-            end
-
-            arr[idx] = k
-            arr[idx + 1] = v
-            idx = idx + 2
-        end
-    end
-
-    return arr
-end
-
---- query
--- @param cmd
--- @param key
--- @param ...
--- @return qry
-local function query(cmd, key, ...)
-    if key then
-        if cmd == 'HMSET' then
-            return encode2array(cmd, key, flatten(...))
-        end
-
-        return encode2array(cmd, key, ...)
-    end
-
-    return encode2array(cmd)
-end
-
---- recv
--- @param self
--- @param nres
--- @return res
--- @return err
--- @return timeout
-local function recv(self, nres)
-    local sock = self.sock
-    local res = {}
-    local data = ''
-    local idx = 0
-    local cur = 0
-
-    assert(nres > idx)
-    -- recv N response
-    while true do
-        local chunk, err, timeout = sock:recv()
-
-        if not chunk or err or timeout then
-            return nil, err, timeout
-        end
-
-        data = data .. chunk
-        while true do
-            local pos, msg, typ = decode(data, cur)
-
-            if pos > 0 then
-                idx = idx + 1
-                res[idx] = {
-                    typ = typ,
-                    msg = msg,
-                }
-                -- got error or received all responses
-                if typ == ERR or idx == nres then
-                    assert(#data == pos)
-                    return res
-                end
-                -- update cursor
-                cur = pos
-                -- decode failure
-            elseif pos == EILSEQ then
-                return nil, 'illegal byte sequence received'
-                -- need more bytes
-            else
-                -- remove used data
-                data = strsub(data, cur + 1)
-                cur = 0
-                break
-            end
-        end
-    end
-end
-
---- subscribe
--- @param self
--- @param ...
--- @return res
-local function subscribe(self)
-
-    return recv(self, 1)
-end
-
---- pushq
--- @param self
--- @param ...
--- @return res
--- @return err
--- @return timeout
-local function pushq(self, ...)
-    local nres = self.nres
-    local issubscribe = SUBSCRIBE_CMDS[self.cmd]
-
-    -- count nres
-    if issubscribe then
-        nres = nres + select('#', ...)
-    else
-        nres = nres + 1
-    end
-
-    if not self.cmdq then
-        local len, err, timeout = self.sock:send(query(self.cmd, ...))
-
-        self.nres = 0
-        if not len or err or timeout then
-            return nil, err, timeout
-        elseif not issubscribe then
-            return recv(self, nres)
-        end
-
-        -- return iterator
-        return
-
-        -- pipeline
-    elseif not issubscribe then
-        self.cmdq[#self.cmdq + 1] = query(self.cmd, ...)
-        self.nres = nres
-        return self
-    end
-
-    return nil, 'cannot use the subscribe commands in pipeline request'
-end
-
---- command
--- @param self
--- @param cmd
--- @return fn
-local function command(self, cmd)
-    if type(cmd) ~= 'string' or not strfind(cmd, '^%a%w*$') then
-        error(strformat('invalid command %q', cmd))
-    end
-
-    self.cmd = cmd:upper()
-
-    return pushq
-end
-
---- class Client
-local Client = {}
-
---- pipeline
--- @return self
-function Client:pipeline()
-    if not self.cmdq then
-        self.cmdq = {}
-    end
-
+    self.sock = sock
+    self.pipelined = false
+    self.cmds = {}
+    self.queries = {}
     return self
 end
 
---- emit
--- @return res
--- @return err
--- @return timeout
-function Client:emit()
-    if self.cmdq then
-        local nres = self.nres
-        local cmdq = self.cmdq
-
-        self.nres = 0
-        self.cmdq = false
-        if nres > 0 then
-            local qry = concat(cmdq)
-            local len, err, timeout = self.sock:send(qry)
-
-            if not len or err or timeout then
-                return nil, err, timeout
-            end
-
-            return recv(self, nres)
-        end
-    end
-
-    return nil, 'pipeline request not exists'
+--- rcvtimeo
+--- @param sec number
+--- @return number? sec
+--- @return error? err
+function Connection:rcvtimeo(sec)
+    return self.sock:rcvtimeo(sec)
 end
 
-Client = setmetatable(Client, {
-    __index = command,
-})
+--- recv
+--- @param cmds string[]
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+function Connection:recv(cmds)
+    local sock = self.sock
+    local res = {}
+    local data = ''
+    local ncmd = #cmds
+    local idx = 1
 
---- new
--- @param cfg
---  host: string
---  port: string
--- @return cli
--- @return err
-local function new(cfg)
-    local opts = DEFAULT_OPTS
-    local sock, err
+    while true do
+        local chunk, err, timeout = sock:recv()
+        if not chunk or err or timeout then
+            return nil, err, timeout
+        end
+        data = data .. chunk
 
-    if cfg then
-        assert(type(cfg) == 'table', 'cfg must be table')
-        opts = {}
-        for k, v in pairs(DEFAULT_OPTS) do
-            local cv = cfg[k]
+        while true do
+            local msg, pos
+            msg, err, pos = decode(cmds[ncmd == 1 and 1 or idx], data)
+            if err then
+                -- decode failure
+                return nil, err
+            elseif not msg then
+                -- more bytes need
+                break
+            end
+            data = sub(data, pos + 1)
+            res[idx] = msg
+            idx = idx + 1
 
-            -- use default value
-            if cv == nil then
-                opts[k] = v
-            else
-                local t = type(v)
-
-                if type(cv) ~= t then
-                    error(strformat('cfg.%s must be %s', k, t))
+            if ncmd == 1 then
+                -- got an error or all responses received
+                if msg.error or #data == 0 then
+                    return idx == 2 and res[1] or res
                 end
-                opts[k] = cv
+            elseif idx > ncmd then
+                -- all pipelined response received
+                assert(#data == 0)
+                return res
             end
         end
     end
+end
 
-    -- connect
-    sock, err = InetClient.new(opts)
+--- discard
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+function Connection:discard()
+    self.pipelined = false
+    self.cmds = {}
+    self.queries = {}
+end
+
+--- exec
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+function Connection:exec()
+    local cmds = self.cmds
+    local q = concat(self.queries)
+    self:discard()
+
+    local len, err, timeout = self.sock:send(q)
+    if not len or err or timeout then
+        return nil, err, timeout
+    end
+
+    return self:recv(cmds)
+end
+
+--- pipeline
+--- @param fn function
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+function Connection:pipeline(fn)
+    if not is_callable(fn) then
+        error('fn must be callable', 2)
+    end
+
+    self.pipelined = true
+    local ok, doexec = pcall(fn)
+    if ok and doexec == true then
+        return self:exec()
+    end
+    self:discard()
+    if not ok then
+        error(doexec)
+    end
+end
+
+--- multi
+--- @param fn function
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+function Connection:multi(fn)
+    if not is_callable(fn) then
+        error('fn must be callable', 2)
+    elseif self.pipelined then
+        return nil, format('command %q cannot be executed in the pipeline mode',
+                           'MULTI')
+    end
+
+    local res, err, timeout = self:sendcmd('MULTI')
+    if not res then
+        return nil, err, timeout
+    elseif res.error then
+        return nil, res.message
+    end
+
+    local ok, doexec = pcall(fn)
+    if ok and doexec == true then
+        -- exec
+        return self:sendcmd('EXEC')
+    end
+
+    res, err, timeout = self:sendcmd('DISCARD')
+    if not ok then
+        error(doexec)
+    end
+    return res, err, timeout
+end
+
+--- pushcmd
+--- @param cmd string
+--- @param ... string
+function Connection:pushcmd(cmd, ...)
+    self.cmds[#self.cmds + 1] = cmd
+    self.queries[#self.queries + 1] = encode(cmd, ...)
+end
+
+--- sendcmd
+--- @param cmd string
+--- @param ... string
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+function Connection:sendcmd(cmd, ...)
+    self:pushcmd(cmd, ...)
+    if not self.pipelined then
+        return self:exec()
+    end
+end
+
+--- subscriber can send only the following commands
+local SUBSCRIBE = 1
+local UNSUBSCRIBE = 2
+local SUBSCRIBE_CMDS = {
+    -- subscribe
+    SUBSCRIBE = SUBSCRIBE,
+    SSUBSCRIBE = SUBSCRIBE,
+    PSUBSCRIBE = SUBSCRIBE,
+    -- unsubscribe
+    UNSUBSCRIBE = UNSUBSCRIBE,
+    SUNSUBSCRIBE = UNSUBSCRIBE,
+    PUNSUBSCRIBE = UNSUBSCRIBE,
+}
+
+--- subscmd
+--- @param cmd string
+--- @param ... string
+--- @return net.redis.subscriber? res
+--- @return any err
+--- @return boolean? timeout
+function Connection:subscmd(cmd, ...)
+    if self.pipelined then
+        return nil, format('command %q cannot be executed in pipeline', cmd)
+    end
+
+    -- must receive results for each channel/pattern
+    local chs = {
+        ...,
+    }
+    for i = 1, select('#', ...) do
+        local ch = chs[i]
+        if not is_string(ch) or find(ch, '^%s*$') then
+            -- invalid arguments
+            error(format('channel#%d %q must be non-empty string', i,
+                         tostring(ch)), 2)
+        end
+    end
+
+    local res, err, timeout = self:sendcmd(cmd, ...)
+    if not res or SUBSCRIBE_CMDS[cmd] == UNSUBSCRIBE then
+        return res, err, timeout
+    elseif res.error then
+        return nil, res.message
+    end
+
+    -- create subscriber
+    return new_subscriber(self, cmd, chs)
+end
+
+Connection = require('metamodule').new.Connection(Connection)
+
+--- sendcmd
+--- @param self net.redis.client
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+local function sendcmd(self, ...)
+    return self.conn:sendcmd(self.cmd, ...)
+end
+
+--- subscmd
+--- @param self net.redis.client
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+local function subscmd(self, ...)
+    return self.conn:subscmd(self.cmd, ...)
+end
+
+--- unsubscmd
+--- @param self net.redis.client
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+local function unsubscmd(self, ...)
+    return nil, format(
+               'command %q must be executed by the net.redis.subscriber',
+               self.cmd)
+end
+
+--- command
+--- @param cmd string
+--- @return function fn
+local function command(self, cmd)
+    if not is_string(cmd) or not find(cmd, '^%a%w*$') then
+        error(format('invalid command %q', cmd))
+    end
+
+    self.cmd = upper(cmd)
+    local subs = SUBSCRIBE_CMDS[self.cmd]
+    if not subs then
+        return sendcmd
+    elseif subs == SUBSCRIBE then
+        return subscmd
+    end
+    return unsubscmd
+end
+
+--- pipeline
+--- @param self net.redis.client
+--- @param fn function
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+local function pipeline(self, fn)
+    return self.conn:pipeline(fn)
+end
+
+--- multi
+--- @param self net.redis.client
+--- @param fn function
+--- @return table? res
+--- @return any err
+--- @return boolean? timeout
+local function multi(self, fn)
+    return self.conn:multi(fn)
+end
+
+--- @class net.redis.client
+--- @field conn net.redis.client.Connection
+--- @field cmd string
+
+--- new
+--- @param host? string
+--- @param port? integer|string
+--- @param opts? table
+--- @return net.redis.client? c
+--- @return any err
+local function new(host, port, opts)
+    local conn, err = Connection(host, port, opts)
     if err then
         return nil, err
     end
 
     return setmetatable({
-        sock = sock,
-        cmdq = false,
-        nres = 0,
+        conn = conn,
+        cmd = '',
+        pipeline = pipeline,
+        multi = multi,
     }, {
-        __index = Client,
+        __index = command,
     })
 end
 
