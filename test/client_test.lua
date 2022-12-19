@@ -181,7 +181,7 @@ function testcase.multi()
         },
     })
 
-    -- test that not discards queued request if function does not return true
+    -- test that discards queued request if function does not return true
     res = assert(c:multi(function()
         assert.equal(c:set('foo', 'bar'), {
             command = 'SET',
@@ -200,6 +200,14 @@ function testcase.multi()
         message = 'OK',
     })
 
+    -- test that cannot execute a multi command in pipeline mode
+    c:pipeline(function()
+        res, err = c:multi(function()
+        end)
+        assert.is_nil(res)
+        assert.match(err, 'cannot be executed in the pipeline mode')
+    end)
+
     -- test that catch the exception from a function
     err = assert.throws(function()
         c:multi(function()
@@ -210,7 +218,7 @@ function testcase.multi()
 
     -- test that throws an error if fn argument is not callable
     err = assert.throws(function()
-        c:pipeline(1)
+        c:multi(1)
     end)
     assert.match(err, 'fn must be callable')
 end
