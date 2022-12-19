@@ -207,12 +207,16 @@ end
 ---@return boolean? timeout
 function Connection:quit()
     local res, err, timeout = self:sendcmd('QUIT')
-    if not res then
-        return false, err, timeout
-    elseif res.error then
-        return false, res.message
+    if res and res.error then
+        err = res.message
     end
-    return self.sock:close()
+
+    -- forcibly close the connection
+    local ok, serr, stimeout = self.sock:close()
+    if not ok then
+        return false, serr, stimeout
+    end
+    return true, err, timeout
 end
 
 --- pushcmd
