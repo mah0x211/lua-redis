@@ -106,6 +106,75 @@ if redis-server replies with multiple messages for a single command, such as the
 }
 ```
 
+## Set timeout seconds
+
+### sec, err = s:sndtimeo( [sec] )
+
+get or set the send timeout seconds.
+
+**Paramters**
+
+- `sec:number`: set the timeout seconds.
+
+**Returns**
+
+- `sec:number`: current or previous timeout seconds.
+- `err:any`: error message.
+
+
+### sec, err = s:rcvtimeo( [sec] )
+
+get or set the receive timeout seconds.
+
+**Paramters**
+
+- `sec:number`: set the timeout seconds.
+
+**Returns**
+
+- `sec:number`: current or previous timeout seconds.
+- `err:any`: error message.
+
+**Usage**
+
+```lua
+local clock = require('clock')
+local dump = require('dump')
+local function printdump(v)
+    print(dump(v))
+end
+
+local redis = require('redis')
+
+-- create client for subscribe
+local c = redis.new()
+-- set timeout 1.2 sec
+local old_timeout_val = assert(c:rcvtimeo(1.2))
+printdump({
+    old_timeout_val = old_timeout_val,
+})
+-- {
+--     old_timeout_val = 0
+-- }
+
+-- create subscriber
+local s = assert(c:subscribe('foo'))
+-- receive message
+local elapsed = clock.gettime()
+local res, err, timeout = s:recv()
+elapsed = clock.gettime() - elapsed
+printdump({
+    res = res,
+    err = err,
+    timeout = timeout,
+    elapsed = elapsed,
+})
+-- {
+--     elapsed = 1.2011869999114,
+--     timeout = true
+-- }
+```
+
 
 ## Close the connection
 
@@ -419,62 +488,6 @@ printdump(res)
 --         }
 --     },
 --     type = "ARR"
--- }
-```
-
-
-### sec, err = s:rcvtimeo( [sec] )
-
-get or set the receive timeout seconds.
-
-**Paramters**
-
-- `sec:number`: set the receive timeout seconds.
-
-**Returns**
-
-- `sec:number`: current or previous timeout seconds.
-- `err:any`: error message.
-
-
-**Usage**
-
-```lua
-local clock = require('clock')
-local dump = require('dump')
-local function printdump(v)
-    print(dump(v))
-end
-
-local redis = require('redis')
-
--- create client for subscribe
-local c = redis.new()
--- create subscriber
-local s = assert(c:subscribe('foo'))
-
--- set timeout 1.2 sec
-local old_timeout_val = assert(s:rcvtimeo(1.2))
-printdump({
-    old_timeout_val = old_timeout_val,
-})
--- {
---     old_timeout_val = 0
--- }
-
--- receive message
-local elapsed = clock.gettime()
-local res, err, timeout = s:recv()
-elapsed = clock.gettime() - elapsed
-printdump({
-    res = res,
-    err = err,
-    timeout = timeout,
-    elapsed = elapsed,
-})
--- {
---     elapsed = 1.2011869999114,
---     timeout = true
 -- }
 ```
 

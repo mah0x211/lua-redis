@@ -65,6 +65,14 @@ function Connection:init(host, port, opts)
     return self
 end
 
+--- sndtimeo
+--- @param sec number
+--- @return number? sec
+--- @return error? err
+function Connection:sndtimeo(sec)
+    return self.sock:sndtimeo(sec)
+end
+
 --- rcvtimeo
 --- @param sec number
 --- @return number? sec
@@ -366,6 +374,24 @@ local function quit(self)
     return self._conn:quit()
 end
 
+--- sndtimeo
+--- @param self redis
+--- @param sec? number
+--- @return number? sec
+--- @return any err
+local function sndtimeo(self, sec)
+    return self._conn:sndtimeo(sec)
+end
+
+--- rcvtimeo
+--- @param self redis
+--- @param sec? number
+--- @return number? sec
+--- @return any err
+local function rcvtimeo(self, sec)
+    return self._conn:rcvtimeo(sec)
+end
+
 --- @class redis
 --- @field _conn redis.Connection
 --- @field _cmd string
@@ -386,6 +412,8 @@ local function new(host, port, opts)
     return setmetatable({
         _conn = conn,
         _cmd = '',
+        sndtimeo = sndtimeo,
+        rcvtimeo = rcvtimeo,
         pipeline = pipeline,
         quit = quit,
         multi = multi,
