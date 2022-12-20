@@ -34,8 +34,11 @@ create new redis client.
 
 ## Command Execution
 
-calling the client method executes the redis command with the same name as the method except the following commands;
+calling the client method executes the redis command with the same name as the method except the following methods;
 
+- `sndtimeo`
+- `rcvtimeo`
+- `pipeline`
 - `quit`
 - `multi`
 - `subscribe`
