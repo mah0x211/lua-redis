@@ -366,6 +366,15 @@ local function quit(self)
     return self._conn:quit()
 end
 
+--- rcvtimeo
+--- @param self redis
+--- @param sec? number
+--- @return number? sec
+--- @return any err
+local function rcvtimeo(self, sec)
+    return self._conn:rcvtimeo(sec)
+end
+
 --- @class redis
 --- @field _conn redis.Connection
 --- @field _cmd string
@@ -386,6 +395,7 @@ local function new(host, port, opts)
     return setmetatable({
         _conn = conn,
         _cmd = '',
+        rcvtimeo = rcvtimeo,
         pipeline = pipeline,
         quit = quit,
         multi = multi,

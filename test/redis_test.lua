@@ -271,18 +271,6 @@ function testcase.pubsub_channel()
     -- test that create subscriber
     local s = assert(c:subscribe('foo', 'bar', 'baz'))
 
-    -- test that can set a receive timeout
-    assert(s:rcvtimeo(1.2))
-    local t = timer.new()
-    t:start()
-    res, err, timeout = s:recv()
-    t = t:stop()
-    assert.is_nil(res)
-    assert.is_nil(err)
-    assert.is_boolean(timeout)
-    assert.greater(t, 1.2)
-    assert.less(t, 1.3)
-
     -- test that publish message
     for _, v in ipairs(pubs) do
         res = assert(v.p:publish(v.ch, v.msg))
@@ -462,4 +450,29 @@ function testcase.pubsub_pattern()
         channels[m.channel] = nil
     end
     assert.is_nil(next(channels))
+end
+
+function testcase.timeout()
+    local c = assert(redis.new())
+
+    -- test that set a receive timeout
+    assert(c:rcvtimeo(1.2))
+    -- test that get a receive timeout
+    assert.equal(math.floor((c:rcvtimeo() + 0.01) * 10) / 10, 1.2)
+
+    -- test that recv method times out
+    local s = assert(c:subscribe('foo', 'bar', 'baz'))
+    local t = timer.new()
+    t:start()
+    local res, err, timeout = s:recv()
+    t = t:stop()
+    assert.is_nil(res)
+    assert.is_nil(err)
+    assert.is_boolean(timeout)
+    assert.greater(t, 1.2)
+    assert.less(t, 1.3)
+
+    -- test that throws an error if sec argument is invalid
+    err = assert.throws(c.rcvtimeo, c, {})
+    assert.match(err, 'sec must be finite-number')
 end

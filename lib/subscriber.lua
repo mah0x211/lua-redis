@@ -91,15 +91,6 @@ function Subscriber:unsubscribe(...)
     return res
 end
 
---- rcvtimeo
---- @param sec number
---- @return number? sec
---- @return any err
-function Subscriber:rcvtimeo(sec)
-    local conn = getconn(self)
-    return conn:rcvtimeo(sec)
-end
-
 --- recv
 --- @return table? res
 --- @return any err
