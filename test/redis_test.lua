@@ -455,6 +455,11 @@ end
 function testcase.timeout()
     local c = assert(redis.new())
 
+    -- test that set a send timeout
+    assert(c:sndtimeo(1.2))
+    -- test that get a send timeout
+    assert.equal(math.floor((c:sndtimeo() + 0.01) * 10) / 10, 1.2)
+
     -- test that set a receive timeout
     assert(c:rcvtimeo(1.2))
     -- test that get a receive timeout

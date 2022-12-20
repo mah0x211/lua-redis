@@ -108,6 +108,20 @@ if redis-server replies with multiple messages for a single command, such as the
 
 ## Set timeout seconds
 
+### sec, err = s:sndtimeo( [sec] )
+
+get or set the send timeout seconds.
+
+**Paramters**
+
+- `sec:number`: set the timeout seconds.
+
+**Returns**
+
+- `sec:number`: current or previous timeout seconds.
+- `err:any`: error message.
+
+
 ### sec, err = s:rcvtimeo( [sec] )
 
 get or set the receive timeout seconds.
