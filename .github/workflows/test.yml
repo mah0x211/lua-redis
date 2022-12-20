@@ -57,16 +57,6 @@ jobs:
         with:
           submodules: 'true'
       -
-        name: Setup Lua ${{ matrix.lua-version }}
-        uses: leafo/gh-actions-lua@v9
-        with:
-          luaVersion: ${{ matrix.lua-version }}
-      -
-        name: Setup Luarocks
-        uses: leafo/gh-actions-luarocks@v4
-        with:
-          luarocksVersion: "3.8.0"
-      -
         name: Install Required Packages
         run: |
           sudo apt install libtool
@@ -78,14 +68,24 @@ jobs:
           make all
           sudo make install
       -
+        name: Setup Lua ${{ matrix.lua-version }}
+        uses: leafo/gh-actions-lua@v9
+        with:
+          luaVersion: ${{ matrix.lua-version }}
+      -
         name: Cache lua modules
         id: cache-luarocks
         uses: actions/cache@v3
         with:
           path: .luarocks
-          key: ${{ runner.os }}-${{ matrix.lua-version }}-cache-${{ hashFiles('net-redis-scm-1.rockspec') }}
+          key: ${{ runner.os }}-${{ matrix.lua-version }}-cache-${{ hashFiles('rockspecs/redis-scm-1.rockspec') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.lua-version }}-cache-
+      -
+        name: Setup Luarocks
+        uses: leafo/gh-actions-luarocks@v4
+        with:
+          luarocksVersion: "3.8.0"
       -
         name: Install
         run: |

@@ -22,15 +22,15 @@
 local gsub = string.gsub
 local ipairs = ipairs
 
---- @class net.redis.subscriber
---- @field conn net.redis.client.Connection
+--- @class redis.subscriber
+--- @field conn redis.Connection
 --- @field cmd string
 local Subscriber = {}
 
 --- init
---- @param conn net.redis.client.Connection
+--- @param conn redis.Connection
 --- @param cmd string
---- @return net.redis.subscriber
+--- @return redis.subscriber
 function Subscriber:init(conn, cmd)
     self.conn = conn
     self.cmd = cmd
@@ -38,8 +38,8 @@ function Subscriber:init(conn, cmd)
 end
 
 --- getconn
---- @param self net.redis.subscriber
---- @return net.redis.client.Connection
+--- @param self redis.subscriber
+--- @return redis.Connection
 local function getconn(self)
     if not self.conn then
         error(

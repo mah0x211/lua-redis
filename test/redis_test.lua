@@ -1,7 +1,7 @@
 require('luacov')
 local testcase = require('testcase')
 local timer = require('testcase.timer')
-local redis = require('net.redis')
+local redis = require('redis')
 
 function testcase.before_each()
     local c = assert(redis.new())
@@ -236,7 +236,7 @@ function testcase.client_cannot_exec_unsubscribe_commands()
         assert.is_nil(res)
         assert.equal(err,
                      string.format(
-                         'command %q must be executed by the net.redis.subscriber',
+                         'command %q must be executed by the redis.subscriber',
                          string.upper(cmd)))
     end
 end
