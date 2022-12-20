@@ -2,8 +2,8 @@ codefromstrings = false
 runreport = true
 deletestats = false
 modules = {
-    ['net.redis'] = 'redis.lua',
-    ['net.redis.decode'] = 'lib/decode.lua',
-    ['net.redis.encode'] = 'lib/encode.lua',
-    ['net.redis.subscriber'] = 'lib/subscriber.lua',
+    ['redis'] = 'redis.lua',
+    ['redis.decode'] = 'lib/decode.lua',
+    ['redis.encode'] = 'lib/encode.lua',
+    ['redis.subscriber'] = 'lib/subscriber.lua',
 }

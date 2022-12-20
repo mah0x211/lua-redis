@@ -33,11 +33,11 @@ local isa = require('isa')
 local is_callable = isa.callable
 local is_string = isa.string
 local new_inet_client = require('net.stream.inet').client.new
-local new_subscriber = require('net.redis.subscriber')
-local encode = require('net.redis.encode')
-local decode = require('net.redis.decode')
+local new_subscriber = require('redis.subscriber')
+local encode = require('redis.encode')
+local decode = require('redis.decode')
 
---- @class net.redis.Connection
+--- @class redis.Connection
 --- @field sock net.Socket
 --- @field pipelined boolean
 --- @field cmds string[]
@@ -48,7 +48,7 @@ local Connection = {}
 --- @param host? string
 --- @param port? integer|string
 --- @param opts? table
---- @return net.redis.Connection? c
+--- @return redis.Connection? c
 --- @return any err
 --- @return boolean? timeout
 function Connection:init(host, port, opts)
@@ -257,7 +257,7 @@ local SUBSCRIBE_CMDS = {
 --- subscmd
 --- @param cmd string
 --- @param ... string
---- @return net.redis.subscriber? res
+--- @return redis.subscriber? res
 --- @return any err
 --- @return boolean? timeout
 function Connection:subscmd(cmd, ...)
@@ -292,7 +292,7 @@ end
 Connection = require('metamodule').new.Connection(Connection)
 
 --- sendcmd
---- @param self net.redis
+--- @param self redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
@@ -301,7 +301,7 @@ local function sendcmd(self, ...)
 end
 
 --- subscmd
---- @param self net.redis
+--- @param self redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
@@ -310,14 +310,13 @@ local function subscmd(self, ...)
 end
 
 --- unsubscmd
---- @param self net.redis
+--- @param self redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
 local function unsubscmd(self, ...)
-    return nil, format(
-               'command %q must be executed by the net.redis.subscriber',
-               self._cmd)
+    return nil, format('command %q must be executed by the redis.subscriber',
+                       self._cmd)
 end
 
 --- command
@@ -339,7 +338,7 @@ local function command(self, cmd)
 end
 
 --- pipeline
---- @param self net.redis
+--- @param self redis
 --- @param fn function
 --- @return table? res
 --- @return any err
@@ -349,7 +348,7 @@ local function pipeline(self, fn)
 end
 
 --- multi
---- @param self net.redis
+--- @param self redis
 --- @param fn function
 --- @return table? res
 --- @return any err
@@ -359,7 +358,7 @@ local function multi(self, fn)
 end
 
 --- quit
---- @param self net.redis
+--- @param self redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
@@ -367,15 +366,15 @@ local function quit(self)
     return self._conn:quit()
 end
 
---- @class net.redis
---- @field _conn net.redis.Connection
+--- @class redis
+--- @field _conn redis.Connection
 --- @field _cmd string
 
 --- new
 --- @param host? string
 --- @param port? integer|string
 --- @param opts? table
---- @return net.redis? c
+--- @return redis? c
 --- @return any err
 --- @return boolean? timeout
 local function new(host, port, opts)
