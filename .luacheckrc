@@ -1,5 +1,6 @@
 std = 'max'
 include_files = {
+    'redis.lua',
     'lib/**/*.lua',
     'test/*_test.lua',
 }
