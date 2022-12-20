@@ -1,7 +1,7 @@
 require('luacov')
 local testcase = require('testcase')
 local timer = require('testcase.timer')
-local redis = require('net.redis.client')
+local redis = require('net.redis')
 
 function testcase.before_each()
     local c = assert(redis.new())

@@ -37,7 +37,7 @@ local new_subscriber = require('net.redis.subscriber')
 local encode = require('net.redis.encode')
 local decode = require('net.redis.decode')
 
---- @class net.redis.client.Connection
+--- @class net.redis.Connection
 --- @field sock net.Socket
 --- @field pipelined boolean
 --- @field cmds string[]
@@ -48,7 +48,7 @@ local Connection = {}
 --- @param host? string
 --- @param port? integer|string
 --- @param opts? table
---- @return net.redis.client.Connection? c
+--- @return net.redis.Connection? c
 --- @return any err
 --- @return boolean? timeout
 function Connection:init(host, port, opts)
@@ -68,7 +68,7 @@ end
 --- rcvtimeo
 --- @param sec number
 --- @return number? sec
---- @return error? err
+--- @return any err
 function Connection:rcvtimeo(sec)
     return self.sock:rcvtimeo(sec)
 end
@@ -292,7 +292,7 @@ end
 Connection = require('metamodule').new.Connection(Connection)
 
 --- sendcmd
---- @param self net.redis.client
+--- @param self net.redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
@@ -301,7 +301,7 @@ local function sendcmd(self, ...)
 end
 
 --- subscmd
---- @param self net.redis.client
+--- @param self net.redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
@@ -310,7 +310,7 @@ local function subscmd(self, ...)
 end
 
 --- unsubscmd
---- @param self net.redis.client
+--- @param self net.redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
@@ -339,7 +339,7 @@ local function command(self, cmd)
 end
 
 --- pipeline
---- @param self net.redis.client
+--- @param self net.redis
 --- @param fn function
 --- @return table? res
 --- @return any err
@@ -349,7 +349,7 @@ local function pipeline(self, fn)
 end
 
 --- multi
---- @param self net.redis.client
+--- @param self net.redis
 --- @param fn function
 --- @return table? res
 --- @return any err
@@ -359,7 +359,7 @@ local function multi(self, fn)
 end
 
 --- quit
---- @param self net.redis.client
+--- @param self net.redis
 --- @return table? res
 --- @return any err
 --- @return boolean? timeout
@@ -367,15 +367,15 @@ local function quit(self)
     return self._conn:quit()
 end
 
---- @class net.redis.client
---- @field _conn net.redis.client.Connection
+--- @class net.redis
+--- @field _conn net.redis.Connection
 --- @field _cmd string
 
 --- new
 --- @param host? string
 --- @param port? integer|string
 --- @param opts? table
---- @return net.redis.client? c
+--- @return net.redis? c
 --- @return any err
 --- @return boolean? timeout
 local function new(host, port, opts)
