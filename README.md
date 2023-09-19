@@ -22,7 +22,7 @@ create new redis client.
 - `host:string`: host address. (default: `127.0.0.1`)
 - `port:string|integer`: port number (default: `6379`)
 - `opts:table`: 
-    - `deadline:uint`: specify a timeout milliseconds as unsigned integer.
+    - `deadline:number`: specify a timeout seconds.
     - `tlscfg:libtls.config`: [libtls.config](https://github.com/mah0x211/lua-libtls/blob/master/doc/config.md) object.
 
 **Returns**
