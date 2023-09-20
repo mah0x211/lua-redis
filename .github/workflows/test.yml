@@ -13,10 +13,10 @@ jobs:
         submodules: 'true'
     -
       name: Setup Lua
-      uses: leafo/gh-actions-lua@v8.0.0
+      uses: leafo/gh-actions-lua@v9
     -
       name: Setup Luarocks
-      uses: leafo/gh-actions-luarocks@v4.0.0
+      uses: leafo/gh-actions-luarocks@v4
     -
       name: Install Tools
       run: luarocks install luacheck
@@ -73,19 +73,8 @@ jobs:
         with:
           luaVersion: ${{ matrix.lua-version }}
       -
-        name: Cache lua modules
-        id: cache-luarocks
-        uses: actions/cache@v3
-        with:
-          path: .luarocks
-          key: ${{ runner.os }}-${{ matrix.lua-version }}-cache-${{ hashFiles('rockspecs/redis-scm-1.rockspec') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.lua-version }}-cache-
-      -
         name: Setup Luarocks
         uses: leafo/gh-actions-luarocks@v4
-        with:
-          luarocksVersion: "3.8.0"
       -
         name: Install
         run: |

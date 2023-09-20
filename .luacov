@@ -1,8 +1,9 @@
 codefromstrings = false
 runreport = true
-deletestats = false
+deletestats = true
 modules = {
     ['redis'] = 'redis.lua',
+    ['redis.connection'] = 'lib/connection.lua',
     ['redis.decode'] = 'lib/decode.lua',
     ['redis.encode'] = 'lib/encode.lua',
     ['redis.subscriber'] = 'lib/subscriber.lua',

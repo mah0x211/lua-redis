@@ -11,17 +11,18 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "isa >= 0.3",
     "net >= 0.34",
+    "metamodule >= 0.5.0",
     "resp >= 0.5.3",
 }
 build = {
     type = "builtin",
     modules = {
-        ['redis'] = "redis.lua",
-        ['redis.decode'] = "lib/decode.lua",
-        ['redis.encode'] = "lib/encode.lua",
-        ['redis.subscriber'] = "lib/subscriber.lua",
+        ["redis"] = "redis.lua",
+        ["redis.connection"] = "lib/connection.lua",
+        ["redis.decode"] = "lib/decode.lua",
+        ["redis.encode"] = "lib/encode.lua",
+        ["redis.subscriber"] = "lib/subscriber.lua",
     },
 }
 
