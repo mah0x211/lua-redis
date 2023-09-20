@@ -10,6 +10,11 @@ function testcase.before_each()
     assert(c:quit())
 end
 
+function testcase.new()
+    local c = assert(redis.new())
+    assert.match(c, '^redis: 0x%x+$', false)
+end
+
 function testcase.error_message()
     local c = assert(redis.new())
 
